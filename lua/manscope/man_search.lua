@@ -41,13 +41,13 @@ man_search.search_man_pages = function(opts)
 
     -- Use a more efficient way to process each man page individually
     local results = {}
-    for _, man_page in ipairs(man_pages) do
-        local man_cmd = string.format("man %s | rg --context 5 '%s'", man_page, query)
-        local page_results = vim.fn.systemlist(man_cmd)
-        if vim.v.shell_error == 0 and #page_results > 0 then
-            vim.list_extend(results, page_results)
-        end
+    for _, man_page in ipairs(vim.fn.systemlist("apropos . | awk '{print $1}'")) do
+    local man_cmd = string.format("man %s | rg --context 5 '%s'", man_page, query)
+    local page_results = vim.fn.systemlist(man_cmd)
+    if vim.v.shell_error == 0 and #page_results > 0 then
+        vim.list_extend(results, page_results)
     end
+end
 
     if #results == 0 then
         print("No detailed entries found for: " .. query)
