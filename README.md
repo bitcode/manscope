@@ -14,8 +14,8 @@ Using lazy.nvim:
 ```lua
 require('lazy').setup({
     {
-        'yourusername/manscope',  -- Replace 'yourusername' with your actual GitHub username or organization
-        cmd = 'Telescope manscope',  -- This ensures that the plugin is loaded only when needed
+        'bitcode/manscope',  
+        cmd = 'Telescope manscope',  
         config = function()
             require('manscope').setup({
                 context_lines = 10,  -- Example of a configurable option
@@ -31,3 +31,5 @@ require('lazy').setup({
     }
 })
 ```
+ 
+made with chatgipittie good luck
