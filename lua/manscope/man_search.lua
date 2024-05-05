@@ -5,14 +5,18 @@ local actions = require('telescope.actions')
 local action_state = require('telescope.actions.state')
 
 local function log_to_file(msg)
-    local log_file = vim.fn.stdpath('cache') .. '/manscope.log'
+    local log_file_path = vim.fn.stdpath('cache') .. '/manscope.log'
     local date = os.date('%Y-%m-%d %H:%M:%S')
     local final_message = string.format("[%s] %s\n", date, msg)
-    local file = io.open(log_file, 'a')
-    if file then
-        file:write(final_message)
-        file:close()
+
+    local file, err = io.open(log_file_path, 'a')
+    if not file then
+        print("Failed to open log file: " .. err)  -- Display error in Neovim
+        return
     end
+
+    file:write(final_message)
+    file:close()
 end
 
 local function is_command_available(command)
@@ -89,4 +93,3 @@ man_search.search_man_pages = function(opts)
 end
 
 return man_search
-
