@@ -26,14 +26,15 @@ local function get_all_man_pages()
     end
 
     local paths = vim.split(manpath, ':', true)
-    local command = table.concat(vim.tbl_map(function(path)
+    local commands = vim.tbl_map(function(path)
         return "find " .. path .. " -type f -name '*.[0-9]*'"
-    end, paths), "; ")  -- Using semicolon to separate commands
+    end, paths)
+    local command = table.concat(commands, " || ")  -- Continue even if one find fails
 
-    command = command .. " | sed 's/.*\\///' | sort -u"
+    command = command .. " | sed 's/.*\\///' | sort -u"  -- Unique sorting of man page names
     local man_pages = vim.fn.systemlist(command)
     if vim.v.shell_error ~= 0 then
-        log_to_file("Failed to list man pages using MANPATH.")
+        log_to_file("Failed to list man pages using MANPATH: " .. vim.inspect(man_pages))
         return {}
     end
     return man_pages
@@ -47,12 +48,12 @@ local function search_man_pages(opts)
     local man_pages = get_all_man_pages()  -- Fetch all man pages using the new function
     local results = {}
 
+    -- Using rg to search within man pages for the query
     for _, man_page in ipairs(man_pages) do
-        local man_cmd = "man " .. man_page .. " | col -b"  -- Ensure man output is plain text
-        local content = vim.fn.system(man_cmd)
-        local matches = vim.fn.split(content, '\n')
-        for _, line in ipairs(matches) do
-            if line:find(query) then
+        local man_cmd = "man " .. man_page .. " | col -b | rg --context 5 -e '" .. query .. "'"
+        local match_output = vim.fn.system(man_cmd)
+        if vim.v.shell_error == 0 and not vim.trim(match_output) == "" then
+            for _, line in ipairs(vim.split(match_output, '\n')) do
                 table.insert(results, man_page .. ": " .. line)
             end
         end
@@ -69,13 +70,21 @@ local function search_man_pages(opts)
         prompt_title = "Man pages for " .. query,
         finder = finders.new_table({
             results = results,
-            entry_maker = entry_maker
+            entry_maker = function(entry)
+                return {
+                    value = entry,
+                    display = entry,
+                    ordinal = entry,
+                }
+            end
         }),
         sorter = conf.generic_sorter(opts),
         attach_mappings = function(prompt_bufnr, map)
             actions.select_default:replace(function()
                 local selection = action_state.get_selected_entry()
                 if selection then
+                    -- Open man page or perform other actions
+                    vim.cmd('Man ' .. vim.fn.fnamemodify(selection.value, ':t'))
                     log_to_file("Selected value: " .. selection.value)
                 end
                 actions.close(prompt_bufnr)
