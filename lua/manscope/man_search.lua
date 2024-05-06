@@ -19,6 +19,27 @@ local function log_to_file(msg)
     file:close()
 end
 
+local function get_all_man_pages()
+    local manpath = vim.fn.getenv("MANPATH")
+    if manpath == vim.NIL or manpath == "" then
+        manpath = "/usr/share/man:/usr/local/man"  -- Fallback if MANPATH isn't set
+    end
+
+    local paths = vim.split(manpath, ':', true)
+    -- Use table.concat and vim.tbl_map to build the command
+    local command = table.concat(vim.tbl_map(function(path)
+        return "find " .. path .. " -type f -name '*.[0-9]*'"
+    end, paths), "; ")  -- Using semicolon to separate commands
+
+    command = command .. " | sed 's/.*\\///' | sort -u"
+    local man_pages = vim.fn.systemlist(command)
+    if vim.v.shell_error ~= 0 then
+        log_to_file("Failed to list man pages using MANPATH.")
+        return {}
+    end
+    return man_pages
+end
+
 local function is_command_available(command)
     if vim.fn.executable(command) == 0 then
         log_to_file("Command not found: " .. command)
@@ -53,12 +74,10 @@ man_search.search_man_pages = function(opts)
     local query = vim.fn.input("Search term: ")
     log_to_file("Search term: " .. query)
 
-    -- Directly list all man pages and search
-    local all_man_pages_command = "man -k . | awk '{print $1}'"
-    local all_man_pages = vim.fn.systemlist(all_man_pages_command)
+    local man_pages = get_all_man_pages()  -- Fetch all man pages using the new function
     local results = {}
 
-    for _, man_page in ipairs(all_man_pages) do
+    for _, man_page in ipairs(man_pages) do
         local man_cmd = string.format("man %s | rg --context 5 '%s'", man_page, query)
         local page_results = vim.fn.systemlist(man_cmd)
         log_to_file("Processing man page: " .. man_page .. " with results count: " .. #page_results)
@@ -91,5 +110,3 @@ man_search.search_man_pages = function(opts)
         end
     }):find()
 end
-
-return man_search
