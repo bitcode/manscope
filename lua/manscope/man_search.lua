@@ -45,19 +45,20 @@ local function search_man_pages(opts)
     local query = vim.fn.input("Search term: ")
     log_to_file("Search term: " .. query)
 
-    local man_pages = get_all_man_pages()  -- Fetch all man pages using the new function
+    -- Fetch all man page files first
+    local man_pages = get_all_man_pages()
     local results = {}
 
-    -- Using rg to search within man pages for the query
-    for _, man_page in ipairs(man_pages) do
-        local man_cmd = "man " .. man_page .. " | col -b | rg --context 5 -e '" .. query .. "'"
-        local match_output = vim.fn.system(man_cmd)
+    -- Use rg to search within the man page contents
+    for _, man_file in ipairs(man_pages) do
+        local search_cmd = "gzip -dc " .. man_file .. " | rg --context 5 -e '" .. query .. "'"
+        local match_output = vim.fn.system(search_cmd)
         if vim.v.shell_error == 0 and not vim.trim(match_output) == "" then
             for _, line in ipairs(vim.split(match_output, '\n')) do
-                table.insert(results, man_page .. ": " .. line)
+                table.insert(results, man_file .. ": " .. line)
             end
         end
-        log_to_file("Processed man page: " .. man_page)
+        log_to_file("Processed man page: " .. man_file)
     end
 
     if #results == 0 then
@@ -83,8 +84,7 @@ local function search_man_pages(opts)
             actions.select_default:replace(function()
                 local selection = action_state.get_selected_entry()
                 if selection then
-                    -- Open man page or perform other actions
-                    vim.cmd('Man ' .. vim.fn.fnamemodify(selection.value, ':t'))
+                    -- Further action can be defined here
                     log_to_file("Selected value: " .. selection.value)
                 end
                 actions.close(prompt_bufnr)
