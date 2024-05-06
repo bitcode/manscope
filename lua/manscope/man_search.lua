@@ -26,7 +26,6 @@ local function get_all_man_pages()
     end
 
     local paths = vim.split(manpath, ':', true)
-    -- Use table.concat and vim.tbl_map to build the command
     local command = table.concat(vim.tbl_map(function(path)
         return "find " .. path .. " -type f -name '*.[0-9]*'"
     end, paths), "; ")  -- Using semicolon to separate commands
@@ -40,37 +39,8 @@ local function get_all_man_pages()
     return man_pages
 end
 
-local function is_command_available(command)
-    if vim.fn.executable(command) == 0 then
-        log_to_file("Command not found: " .. command)
-        return false
-    end
-    return true
-end
-
-local man_search = {}
-
-local entry_maker = function(entry)
-    local parts = vim.split(entry, ':', true)
-    local filename = parts[1]
-    local line_number = parts[2]
-    local content = table.concat(vim.list_slice(parts, 3), ':')
-    local display_text = string.format("%s [%s]: %s", vim.fn.fnamemodify(filename, ":t"), line_number, content)
-    return {
-        value = entry,
-        display = display_text,
-        ordinal = content,
-    }
-end
-
-man_search.search_man_pages = function(opts)
+local function search_man_pages(opts)
     log_to_file("Starting search...")
-    if not is_command_available("man") or not is_command_available("rg") then
-        log_to_file("Required command(s) not available. Please ensure 'man' and 'rg' are installed.")
-        return
-    end
-
-    opts = opts or {}
     local query = vim.fn.input("Search term: ")
     log_to_file("Search term: " .. query)
 
@@ -78,12 +48,15 @@ man_search.search_man_pages = function(opts)
     local results = {}
 
     for _, man_page in ipairs(man_pages) do
-        local man_cmd = string.format("man %s | rg --context 5 '%s'", man_page, query)
-        local page_results = vim.fn.systemlist(man_cmd)
-        log_to_file("Processing man page: " .. man_page .. " with results count: " .. #page_results)
-        if vim.v.shell_error == 0 and #page_results > 0 then
-            vim.list_extend(results, page_results)
+        local man_cmd = "man " .. man_page .. " | col -b"  -- Ensure man output is plain text
+        local content = vim.fn.system(man_cmd)
+        local matches = vim.fn.split(content, '\n')
+        for _, line in ipairs(matches) do
+            if line:find(query) then
+                table.insert(results, man_page .. ": " .. line)
+            end
         end
+        log_to_file("Processed man page: " .. man_page)
     end
 
     if #results == 0 then
@@ -91,6 +64,7 @@ man_search.search_man_pages = function(opts)
         return
     end
 
+    -- Display results using Telescope
     pickers.new(opts, {
         prompt_title = "Man pages for " .. query,
         finder = finders.new_table({
