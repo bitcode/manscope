@@ -1,8 +1,6 @@
 local config = {
     context_lines = 5,  -- Default context lines for rg
     commands = {
-        apropos = "apropos",
-        man = "man",
         rg = "rg"
     }
 }
