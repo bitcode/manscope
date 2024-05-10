@@ -3,21 +3,9 @@ local finders = require('telescope.finders')
 local conf = require('telescope.config').values
 local actions = require('telescope.actions')
 local action_state = require('telescope.actions.state')
-
-local function log_to_file(msg)
-    local log_file_path = vim.fn.stdpath('cache') .. '/manscope.log'
-    local date = os.date('%Y-%m-%d %H:%M:%S')
-    local final_message = string.format("[%s] %s\n", date, msg)
-
-    local file, err = io.open(log_file_path, 'a')
-    if not file then
-        print("Failed to open log file: " .. err)  -- Display error in Neovim
-        return
-    end
-
-    file:write(final_message)
-    file:close()
-end
+local logger = require('manscope.log_module')
+local config = require('manscope.config')
+local sqlite3 = require('lsqlite3')
 
 local function get_all_man_pages()
     local manpath = vim.fn.getenv("MANPATH")
@@ -34,35 +22,39 @@ local function get_all_man_pages()
     command = command .. " | sed 's/.*\\///' | sort -u"  -- Unique sorting of man page names
     local man_pages = vim.fn.systemlist(command)
     if vim.v.shell_error ~= 0 then
-        log_to_file("Failed to list man pages using MANPATH: " .. vim.inspect(man_pages))
+        logger.log_to_file("Failed to list man pages using MANPATH: " .. vim.inspect(man_pages))
         return {}
     end
     return man_pages
 end
 
+-- Enhanced search function leveraging SQLite FTS5 with custom ranking
 local function search_man_pages(opts)
-    log_to_file("Starting search...")
+    logger.log_to_file("Starting search...")
     local query = vim.fn.input("Search term: ")
-    log_to_file("Search term: " .. query)
+    logger.log_to_file("Search term: " .. query)
 
-    -- Fetch all man page files first
-    local man_pages = get_all_man_pages()
+    -- Open the database connection
+    local db = sqlite3.open(config.database_path)
+
+    -- Enhanced search query that incorporates synonyms for more flexible searches
+    local sql = string.format([[
+        SELECT mp.title, mp.content, bm25(mp, 10.0, 1.0) AS rank
+        FROM man_pages mp
+        LEFT JOIN synonyms s ON mp.content MATCH s.synonym
+        WHERE mp.title MATCH '%s' OR mp.content MATCH '%s' OR s.term = '%s'
+        ORDER BY rank DESC  -- Order by descending rank for best matches first
+    ]], query, query, query)
+
     local results = {}
-
-    -- Use rg to search within the man page contents
-    for _, man_file in ipairs(man_pages) do
-        local search_cmd = "gzip -dc " .. man_file .. " | rg --context 5 -e '" .. query .. "'"
-        local match_output = vim.fn.system(search_cmd)
-        if vim.v.shell_error == 0 and not vim.trim(match_output) == "" then
-            for _, line in ipairs(vim.split(match_output, '\n')) do
-                table.insert(results, man_file .. ": " .. line)
-            end
-        end
-        log_to_file("Processed man page: " .. man_file)
+    for row in db:nrows(sql) do
+        table.insert(results, string.format("Title: %s, Content: %s, Rank: %f", row.title, row.content, row.rank))
     end
+    db:close()
 
     if #results == 0 then
-        log_to_file("No detailed entries found for: " .. query)
+        logger.log_to_file("No entries found for: " .. query)
+        print("No results found.")
         return
     end
 
@@ -84,8 +76,8 @@ local function search_man_pages(opts)
             actions.select_default:replace(function()
                 local selection = action_state.get_selected_entry()
                 if selection then
-                    -- Further action can be defined here
-                    log_to_file("Selected value: " .. selection.value)
+                    logger.log_to_file("Selected value: " .. selection.value)
+                    print("Selected: ", selection.value)
                 end
                 actions.close(prompt_bufnr)
             end)
@@ -93,3 +85,7 @@ local function search_man_pages(opts)
         end
     }):find()
 end
+
+return {
+    search_man_pages = search_man_pages
+}
