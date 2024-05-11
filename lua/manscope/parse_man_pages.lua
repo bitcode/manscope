@@ -67,6 +67,7 @@ end
 
 -- Update the database with parsed data
 local function update_database_with_parsed_data(parsed_data, filepath, last_modified)
+    logger.log_to_file("Database path: " .. config.database_path, logger.LogLevel.DEBUG)
     local db = sqlite3.open(config.database_path)
     local stmt = db:prepare([[
         REPLACE INTO man_pages (
@@ -118,13 +119,17 @@ local function process_directory(path, whitelisted_paths, excluded_subpaths)
                 if not excluded_subpaths[fullpath] then
                     process_directory(fullpath, whitelisted_paths, excluded_subpaths)
                 end
-            elseif attr and attr.mode == "file" and (fullpath:match("%.[1-9]$")
-               or fullpath:match("%.gz$") or fullpath:match("%.bz2$") or fullpath:match("%.xz$") or fullpath:match("%.Z$")) then
-                local content = decompress_and_read(fullpath)
-                if content then
-                    process_file(fullpath, content)
-                else
-                    logger.log_to_file("Failed to read or decompress file: " .. fullpath, logger.LogLevel.ERROR)
+            elseif attr and attr.mode == "file" then
+                if fullpath:match("%.[1-9]$") -- Standard man pages
+                   or fullpath:match("%.[1-9]%.gz$") -- Gzipped man pages
+                   or fullpath:match("%.[1-9]%.bz2$") -- Bzipped man pages
+                   or fullpath:match("%.[1-9]%.xz$") then -- Xzipped man pages
+                    local content = decompress_and_read(fullpath)
+                    if content then
+                        process_file(fullpath, content)
+                    else
+                        logger.log_to_file("Failed to read or decompress file: " .. fullpath, logger.LogLevel.ERROR)
+                    end
                 end
             end
         end
