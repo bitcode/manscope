@@ -5,8 +5,13 @@ local logger = require('manscope.log_module')  -- Include the logging module
 
 local function get_man_directories_from_env()
     local manpath = os.getenv("MANPATH")
+    logger.log_to_file("MANPATH: " .. (manpath or "not set"), logger.LogLevel.DEBUG)
     if manpath and #manpath > 0 then
-        return vim.split(manpath, ':', true)
+        local paths = vim.split(manpath, ':', true)
+        for _, path in ipairs(paths) do
+            logger.log_to_file("From ENV: " .. path, logger.LogLevel.DEBUG)
+        end
+        return paths
     else
         return {}
     end
@@ -22,11 +27,15 @@ local function get_man_directories_from_config()
             local map_path = line:match("^MANPATH_MAP%s+%S+%s+(.+)$")
             if mandatory_path then
                 table.insert(paths, mandatory_path)
+                logger.log_to_file("From Config MANDATORY: " .. mandatory_path, logger.LogLevel.DEBUG)
             elseif map_path then
                 table.insert(paths, map_path)
+                logger.log_to_file("From Config MAP: " .. map_path, logger.LogLevel.DEBUG)
             end
         end
         file:close()
+    else
+        logger.log_to_file("Failed to open /etc/manpath.config", logger.LogLevel.ERROR)
     end
     return paths
 end
@@ -35,6 +44,7 @@ local function get_man_directories()
     local paths = get_man_directories_from_env()
     for _, path in ipairs(get_man_directories_from_config()) do
         table.insert(paths, path)
+        logger.log_to_file("Added to processing list: " .. path, logger.LogLevel.DEBUG)
     end
     return paths
 end
