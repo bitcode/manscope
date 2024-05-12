@@ -3,6 +3,7 @@ local sqlite3 = require('lsqlite3')
 local config = require('manscope.config')
 local logger = require('manscope.log_module')  -- Include the logging module
 
+-- Function to get directories from MANPATH environment variable
 local function get_man_directories_from_env()
     local manpath = os.getenv("MANPATH")
     logger.log_to_file("MANPATH: " .. (manpath or "not set"), logger.LogLevel.DEBUG)
@@ -17,12 +18,12 @@ local function get_man_directories_from_env()
     end
 end
 
+-- Function to read directories from /etc/manpath.config
 local function get_man_directories_from_config()
     local paths = {}
     local file = io.open("/etc/manpath.config", "r")
     if file then
         for line in file:lines() do
-            -- Capture MANDATORY_MANPATH and MANPATH_MAP entries
             local mandatory_path = line:match("^MANDATORY_MANPATH%s+(.+)$")
             local map_path = line:match("^MANPATH_MAP%s+%S+%s+(.+)$")
             if mandatory_path then
@@ -40,6 +41,7 @@ local function get_man_directories_from_config()
     return paths
 end
 
+-- Consolidate all directories to be processed
 local function get_man_directories()
     local paths = get_man_directories_from_env()
     for _, path in ipairs(get_man_directories_from_config()) do
@@ -49,15 +51,16 @@ local function get_man_directories()
     return paths
 end
 
-
+-- Calculate checksum of file content
 local function calculate_checksum(input)
     local checksum = 0
     for i = 1, #input do
-        checksum = (checksum + string.byte(input, i)) % 65536 -- Use a larger mod to reduce collisions
+        checksum = (checksum + string.byte(input, i)) % 65536
     end
     return checksum
 end
 
+-- Decompress and read man page files
 local function decompress_and_read(filepath)
     local command
     if filepath:match("%.gz$") then
@@ -82,8 +85,9 @@ local function decompress_and_read(filepath)
     return output
 end
 
+-- Parse man page content
 local function advanced_parse_man_page(content)
-    local cleaned_content = content:gsub("%.[A-Z]+", ""):gsub("\\f[IRB]", "") -- Remove standalone groff commands and font formatting
+    local cleaned_content = content:gsub("%.[A-Z]+", ""):gsub("\\f[IRB]", "")
     local title = content:match(".TH%s+\"([^\"]+)\"")
     local section = content:match(".SH%s+\"([^\"]+)\"")
     local synopsis = content:match(".SY%s+(.-)\n%.YS")
@@ -100,6 +104,7 @@ local function advanced_parse_man_page(content)
     }
 end
 
+-- Update database with parsed data
 local function update_database_with_parsed_data(parsed_data, filepath, last_modified)
     logger.log_to_file("Database path: " .. config.database_path, logger.LogLevel.DEBUG)
     local db = sqlite3.open(config.database_path)
@@ -120,7 +125,7 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
         parsed_data.title, parsed_data.section, parsed_data.content,
         parsed_data.synopsis, parsed_data.example, parsed_data.hyperlink,
         filepath, last_modified, parsed_data.original_name, parsed_data.compressed_name,
-        checksum  -- Use the checksum calculated
+        checksum
     )
     local result = stmt:step()
     if result ~= sqlite3.DONE then
@@ -130,6 +135,7 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
     db:close()
 end
 
+-- Process each man page file
 local function process_file(fullpath, content)
     local attr = lfs.attributes(fullpath)
     local parsed_data = advanced_parse_man_page(content)
@@ -137,6 +143,7 @@ local function process_file(fullpath, content)
     update_database_with_parsed_data(parsed_data, fullpath, attr.modification)
 end
 
+-- Check if the file is likely a man page
 local function is_man_page(file)
     return file:match("%.[1-9]$") or
            file:match("%.[1-9]%.gz$") or
@@ -144,9 +151,12 @@ local function is_man_page(file)
            file:match("%.[1-9]%.xz$")
 end
 
+-- Process each directory containing man pages
 local function process_directory(path)
+    logger.log_to_file("Checking directory: " .. path, logger.LogLevel.DEBUG)
     for file in lfs.dir(path) do
         local fullpath = path .. '/' .. file
+        logger.log_to_file("Inspecting file: " .. fullpath, logger.LogLevel.DEBUG)
         if file ~= "." and file ~= ".." and is_man_page(file) then
             local attr = lfs.attributes(fullpath)
             if attr and attr.mode == "file" then
@@ -157,10 +167,13 @@ local function process_directory(path)
                     logger.log_to_file("Failed to read or decompress file: " .. fullpath, logger.LogLevel.ERROR)
                 end
             end
+        else
+            logger.log_to_file("Skipped non-manpage file: " .. fullpath, logger.LogLevel.DEBUG)
         end
     end
 end
 
+-- Main processing function
 local function main()
     logger.log_to_file("Starting directory processing", logger.LogLevel.INFO)
     local man_directories = get_man_directories()
