@@ -3,6 +3,18 @@ local sqlite3 = require('lsqlite3')
 local config = require('manscope.config')
 local logger = require('manscope.log_module')  -- Include the logging module
 
+-- Function to check if a directory exists and is accessible
+local function directory_exists(path)
+    local ok, err, code = os.rename(path, path)
+    if not ok then
+        if code == 13 then
+            -- Permission denied, but directory exists
+            return true
+        end
+    end
+    return ok, err
+end
+
 -- Function to get directories from MANPATH environment variable
 local function get_man_directories_from_env()
     local manpath = os.getenv("MANPATH")
@@ -178,8 +190,12 @@ local function main()
     logger.log_to_file("Starting directory processing", logger.LogLevel.INFO)
     local man_directories = get_man_directories()
     for _, path in ipairs(man_directories) do
-        logger.log_to_file("Processing directory: " .. path, logger.LogLevel.DEBUG)
-        process_directory(path)
+        if directory_exists(path) then
+            logger.log_to_file("Processing directory: " .. path, logger.LogLevel.DEBUG)
+            process_directory(path)
+        else
+            logger.log_to_file("Directory does not exist or cannot be accessed: " .. path, logger.LogLevel.WARNING)
+        end
     end
 end
 
