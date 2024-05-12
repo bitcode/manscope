@@ -122,24 +122,24 @@ local function process_file(fullpath, content)
     update_database_with_parsed_data(parsed_data, fullpath, attr.modification)
 end
 
+local function is_man_page(file)
+    return file:match("%.[1-9]$") or
+           file:match("%.[1-9]%.gz$") or
+           file:match("%.[1-9]%.bz2$") or
+           file:match("%.[1-9]%.xz$")
+end
+
 local function process_directory(path)
     for file in lfs.dir(path) do
-        if file ~= "." and file ~= ".." then
-            local fullpath = path .. '/' .. file
+        local fullpath = path .. '/' .. file
+        if file ~= "." and file ~= ".." and is_man_page(file) then
             local attr = lfs.attributes(fullpath)
-            if attr and attr.mode == "directory" then
-                process_directory(fullpath)
-            elseif attr and attr.mode == "file" then
-                if fullpath:match("%.[1-9]$") -- Standard man pages
-                   or fullpath:match("%.[1-9]%.gz$") -- Gzipped man pages
-                   or fullpath:match("%.[1-9]%.bz2$") -- Bzipped man pages
-                   or fullpath:match("%.[1-9]%.xz$") then -- Xzipped man pages
-                    local content = decompress_and_read(fullpath)
-                    if content then
-                        process_file(fullpath, content)
-                    else
-                        logger.log_to_file("Failed to read or decompress file: " .. fullpath, logger.LogLevel.ERROR)
-                    end
+            if attr and attr.mode == "file" then
+                local content = decompress_and_read(fullpath)
+                if content then
+                    process_file(fullpath, content)
+                else
+                    logger.log_to_file("Failed to read or decompress file: " .. fullpath, logger.LogLevel.ERROR)
                 end
             end
         end
