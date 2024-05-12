@@ -17,9 +17,13 @@ local function get_man_directories_from_config()
     local file = io.open("/etc/manpath.config", "r")
     if file then
         for line in file:lines() do
-            local path = line:match("^MANDATORY_MANPATH%s+(.+)$")
-            if path then
-                table.insert(paths, path)
+            -- Capture MANDATORY_MANPATH and MANPATH_MAP entries
+            local mandatory_path = line:match("^MANDATORY_MANPATH%s+(.+)$")
+            local map_path = line:match("^MANPATH_MAP%s+%S+%s+(.+)$")
+            if mandatory_path then
+                table.insert(paths, mandatory_path)
+            elseif map_path then
+                table.insert(paths, map_path)
             end
         end
         file:close()
@@ -34,6 +38,7 @@ local function get_man_directories()
     end
     return paths
 end
+
 
 local function calculate_checksum(input)
     local checksum = 0
@@ -150,6 +155,7 @@ local function main()
     logger.log_to_file("Starting directory processing", logger.LogLevel.INFO)
     local man_directories = get_man_directories()
     for _, path in ipairs(man_directories) do
+        logger.log_to_file("Processing directory: " .. path, logger.LogLevel.DEBUG)
         process_directory(path)
     end
 end
