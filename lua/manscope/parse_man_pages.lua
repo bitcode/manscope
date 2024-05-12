@@ -76,25 +76,32 @@ end
 local function decompress_and_read(filepath)
     local command
     if filepath:match("%.gz$") then
-        command = "gzip -dc '" .. filepath .. "'"
+        command = "gzip -dc '" .. filepath:gsub("'", "'\\''") .. "'"
     elseif filepath:match("%.bz2$") then
-        command = "bzip2 -dc '" .. filepath .. "'"
+        command = "bzip2 -dc '" .. filepath:gsub("'", "'\\''") .. "'"
     elseif filepath:match("%.xz$") then
-        command = "xz --decompress --stdout '" .. filepath .. "'"
+        command = "xz --decompress --stdout '" .. filepath:gsub("'", "'\\''") .. "'"
     elseif filepath:match("%.Z$") then
-        command = "uncompress -c '" .. filepath .. "'"
+        command = "uncompress -c '" .. filepath:gsub("'", "'\\''") .. "'"
     else
+        logger.log_to_file("Unsupported format or plain text file: " .. filepath, logger.LogLevel.WARNING)
         return nil  -- Unsupported format or plain text file
     end
 
-    local pipe = io.popen(command)
+    logger.log_to_file("Executing command: " .. command, logger.LogLevel.DEBUG)
+    local pipe, err = io.popen(command, 'r')
     if not pipe then
-        logger.log_to_file("Failed to decompress file: " .. filepath, logger.LogLevel.ERROR)
+        logger.log_to_file("Failed to decompress file with command `" .. command .. "`: " .. (err or "unknown error"), logger.LogLevel.ERROR)
         return nil
     end
     local output = pipe:read("*all")
     pipe:close()
-    return output
+    if output and #output > 0 then
+        return output
+    else
+        logger.log_to_file("No output or empty content after decompression: " .. filepath, logger.LogLevel.ERROR)
+        return nil
+    end
 end
 
 -- Parse man page content
