@@ -7,34 +7,11 @@ local logger = require('manscope.log_module')
 local config = require('manscope.config')
 local sqlite3 = require('lsqlite3')
 
-local function get_all_man_pages()
-    local manpath = vim.fn.getenv("MANPATH")
-    if manpath == vim.NIL or manpath == "" then
-        manpath = "/usr/share/man:/usr/local/man"  -- Fallback if MANPATH isn't set
-    end
-
-    local paths = vim.split(manpath, ':', true)
-    local commands = vim.tbl_map(function(path)
-        return "find " .. path .. " -type f -name '*.[0-9]*'"
-    end, paths)
-    local command = table.concat(commands, " || ")  -- Continue even if one find fails
-
-    command = command .. " | sed 's/.*\\///' | sort -u"  -- Unique sorting of man page names
-    local man_pages = vim.fn.systemlist(command)
-    if vim.v.shell_error ~= 0 then
-        logger.log_to_file("Failed to list man pages using MANPATH: " .. vim.inspect(man_pages))
-        return {}
-    end
-    return man_pages
-end
-
--- Enhanced search function leveraging SQLite FTS5 with custom ranking
 local function search_man_pages(opts)
     logger.log_to_file("Starting search...")
     local query = vim.fn.input("Search term: ")
     logger.log_to_file("Search term: " .. query)
 
-    -- Open the database connection
     local db = sqlite3.open(config.database_path)
 
     -- Enhanced search query that incorporates synonyms for more flexible searches
@@ -58,7 +35,6 @@ local function search_man_pages(opts)
         return
     end
 
-    -- Display results using Telescope
     pickers.new(opts, {
         prompt_title = "Man pages for " .. query,
         finder = finders.new_table({

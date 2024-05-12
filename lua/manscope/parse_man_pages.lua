@@ -3,14 +3,36 @@ local sqlite3 = require('lsqlite3')
 local config = require('manscope.config')
 local logger = require('manscope.log_module')  -- Include the logging module
 
--- Function to check if the path should be processed
-local function is_path_whitelisted(path, whitelisted_paths)
-    for _, base in ipairs(whitelisted_paths) do
-        if path:sub(1, #base) == base then
-            return true
-        end
+local function get_man_directories_from_env()
+    local manpath = os.getenv("MANPATH")
+    if manpath and #manpath > 0 then
+        return vim.split(manpath, ':', true)
+    else
+        return {}
     end
-    return false
+end
+
+local function get_man_directories_from_config()
+    local paths = {}
+    local file = io.open("/etc/manpath.config", "r")
+    if file then
+        for line in file:lines() do
+            local path = line:match("^MANDATORY_MANPATH%s+(.+)$")
+            if path then
+                table.insert(paths, path)
+            end
+        end
+        file:close()
+    end
+    return paths
+end
+
+local function get_man_directories()
+    local paths = get_man_directories_from_env()
+    for _, path in ipairs(get_man_directories_from_config()) do
+        table.insert(paths, path)
+    end
+    return paths
 end
 
 local function calculate_checksum(input)
@@ -21,7 +43,6 @@ local function calculate_checksum(input)
     return checksum
 end
 
--- Function to decompress files based on extension
 local function decompress_and_read(filepath)
     local command
     if filepath:match("%.gz$") then
@@ -46,7 +67,6 @@ local function decompress_and_read(filepath)
     return output
 end
 
--- Advanced Parsing Function Based on groff Man Page Standards
 local function advanced_parse_man_page(content)
     local cleaned_content = content:gsub("%.[A-Z]+", ""):gsub("\\f[IRB]", "") -- Remove standalone groff commands and font formatting
     local title = content:match(".TH%s+\"([^\"]+)\"")
@@ -65,7 +85,6 @@ local function advanced_parse_man_page(content)
     }
 end
 
--- Update the database with parsed data
 local function update_database_with_parsed_data(parsed_data, filepath, last_modified)
     logger.log_to_file("Database path: " .. config.database_path, logger.LogLevel.DEBUG)
     local db = sqlite3.open(config.database_path)
@@ -96,7 +115,6 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
     db:close()
 end
 
--- Function to process each file
 local function process_file(fullpath, content)
     local attr = lfs.attributes(fullpath)
     local parsed_data = advanced_parse_man_page(content)
@@ -104,21 +122,13 @@ local function process_file(fullpath, content)
     update_database_with_parsed_data(parsed_data, fullpath, attr.modification)
 end
 
--- Enhanced directory processing to include parsing and database update
-local function process_directory(path, whitelisted_paths, excluded_subpaths)
-    if not is_path_whitelisted(path, whitelisted_paths) then
-        logger.log_to_file("Skipping non-whitelisted directory: " .. path, logger.LogLevel.DEBUG)
-        return  -- Skip non-whitelisted directories
-    end
-
+local function process_directory(path)
     for file in lfs.dir(path) do
         if file ~= "." and file ~= ".." then
             local fullpath = path .. '/' .. file
             local attr = lfs.attributes(fullpath)
             if attr and attr.mode == "directory" then
-                if not excluded_subpaths[fullpath] then
-                    process_directory(fullpath, whitelisted_paths, excluded_subpaths)
-                end
+                process_directory(fullpath)
             elseif attr and attr.mode == "file" then
                 if fullpath:match("%.[1-9]$") -- Standard man pages
                    or fullpath:match("%.[1-9]%.gz$") -- Gzipped man pages
@@ -136,13 +146,11 @@ local function process_directory(path, whitelisted_paths, excluded_subpaths)
     end
 end
 
--- Main function to initiate directory processing
 local function main()
     logger.log_to_file("Starting directory processing", logger.LogLevel.INFO)
-    local whitelisted_paths = {'/usr', os.getenv('HOME'), '/opt'}
-    local excluded_subpaths = {[os.getenv('HOME') .. '/Downloads'] = true}
-    for _, path in ipairs(whitelisted_paths) do
-        process_directory(path, whitelisted_paths, excluded_subpaths)
+    local man_directories = get_man_directories()
+    for _, path in ipairs(man_directories) do
+        process_directory(path)
     end
 end
 

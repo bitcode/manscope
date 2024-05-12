@@ -39,6 +39,7 @@ local function initialize_database()
         );
     ]]
 
+    -- Database initialization SQL
     if db:exec(sql_statements) ~= sqlite3.OK then
         logger.log_to_file("Failed to create tables: " .. db:errmsg(), logger.LogLevel.ERROR)
         error("Failed to create tables: " .. db:errmsg())
@@ -50,17 +51,14 @@ local function initialize_database()
     ]]
 
     db:close()
-    logger.log_to_file("Database initialized and tables created successfully at " .. config.database_path, logger.LogLevel.INFO)
-    parse_man_pages.start_parsing()  -- Function to begin parsing and populating the database
-end
+      logger.log_to_file("Database initialized and tables created successfully at " .. config.database_path, logger.LogLevel.INFO)
+      parse_man_pages.start_parsing()
+  end
 
--- Setup function to configure the plugin
 local M = {}
 M.setup = function(opts)
     logger.log_to_file("Setting up Manscope with provided options.", logger.LogLevel.DEBUG)
-    -- Extend default config with user-provided options
     config = vim.tbl_deep_extend("force", config, opts or {})
-    -- Initialize the database when the plugin is set up
     initialize_database()
 end
 
