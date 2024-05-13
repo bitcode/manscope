@@ -6,12 +6,18 @@ local parse_man_pages = require('manscope.parse_man_pages')  -- Make sure this m
 
 -- Function to initialize the database and create tables if they don't exist
 local function initialize_database()
+    if not config.database_path then
+        logger.log_to_file("Database path is not set", logger.LogLevel.ERROR)
+        error("Database path is not set")
+        return
+    end
     logger.log_to_file("Attempting to open database at " .. config.database_path, logger.LogLevel.DEBUG)
     local db = sqlite3.open(config.database_path)
     if db == nil then
         logger.log_to_file("Failed to open database at " .. config.database_path, logger.LogLevel.ERROR)
         error("Failed to open database at " .. config.database_path)
-        return
+    else
+        logger.log_to_file("Database opened successfully", logger.LogLevel.INFO)
     end
 
     local sql_statements = [[
