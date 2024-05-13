@@ -72,7 +72,12 @@ local function calculate_checksum(input)
     return checksum
 end
 
--- Decompress and read man page files
+-- Check if the file is likely a man page
+local function is_man_page(file)
+    return file:match("man[1-9]$") or file:match("man[1-9][^/]*$")
+end
+
+-- Improving decompression function to handle uncompressed files:
 local function decompress_and_read(filepath)
     local command
     if filepath:match("%.gz$") then
@@ -81,17 +86,13 @@ local function decompress_and_read(filepath)
         command = "bzip2 -dc '" .. filepath:gsub("'", "'\\''") .. "'"
     elseif filepath:match("%.xz$") then
         command = "xz --decompress --stdout '" .. filepath:gsub("'", "'\\''") .. "'"
-    elseif filepath:match("%.Z$") then
-        command = "uncompress -c '" .. filepath:gsub("'", "'\\''") .. "'"
-    else
-        logger.log_to_file("Unsupported format or plain text file: " .. filepath, logger.LogLevel.WARNING)
-        return nil  -- Unsupported format or plain text file
+    else  -- Plain text or unsupported compressed format
+        command = "cat '" .. filepath:gsub("'", "'\\''") .. "'"
     end
 
-    logger.log_to_file("Executing command: " .. command, logger.LogLevel.DEBUG)
     local pipe, err = io.popen(command, 'r')
     if not pipe then
-        logger.log_to_file("Failed to decompress file with command `" .. command .. "`: " .. (err or "unknown error"), logger.LogLevel.ERROR)
+        logger.log_to_file("Failed to open pipe for: " .. filepath, logger.LogLevel.ERROR)
         return nil
     end
     local output = pipe:read("*all")
@@ -99,7 +100,7 @@ local function decompress_and_read(filepath)
     if output and #output > 0 then
         return output
     else
-        logger.log_to_file("No output or empty content after decompression: " .. filepath, logger.LogLevel.ERROR)
+        logger.log_to_file("No output or empty content after command execution: " .. filepath, logger.LogLevel.ERROR)
         return nil
     end
 end

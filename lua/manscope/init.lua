@@ -61,11 +61,13 @@ local function initialize_database()
       parse_man_pages.start_parsing()
   end
 
+-- File: ./lua/manscope/init.lua
 local M = {}
 M.setup = function(opts)
-    logger.log_to_file("Setting up Manscope with provided options.", logger.LogLevel.DEBUG)
-    config = vim.tbl_deep_extend("force", config, opts or {})
+    -- Extend the default configuration with user provided options
+    config.config = vim.tbl_deep_extend("force", config.config, opts or {})
+    logger.log_to_file("Configuration loaded: Database path set to " .. tostring(config.config.database_path), logger.LogLevel.DEBUG)
+
+    -- Initialize the database only after configuration has been updated
     initialize_database()
 end
-
-return M
