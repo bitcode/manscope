@@ -72,29 +72,6 @@ local function calculate_checksum(input)
     return checksum
 end
 
--- Check if the file is a valid man page
-local function is_valid_man_page(file)
-    local command = "man --whatis " .. vim.fn.shellescape(file)
-    local output = vim.fn.system(command)
-
-    logger.log_to_file("Running command: " .. command, logger.LogLevel.DEBUG)
-    logger.log_to_file("Command output: " .. (output or "nil"), logger.LogLevel.DEBUG)
-    logger.log_to_file("Shell error: " .. vim.v.shell_error, logger.LogLevel.DEBUG)
-
-    if vim.v.shell_error ~= 0 then
-        logger.log_to_file("Failed to identify man page: " .. file .. " - Error: " .. vim.v.shell_error, logger.LogLevel.DEBUG)
-        return false
-    end
-
-    if output and output:match("^%S+ %(%d%)") then
-        logger.log_to_file("Confirmed man page: " .. file, logger.LogLevel.DEBUG)
-        return true
-    else
-        logger.log_to_file("Not a man page: " .. file, logger.LogLevel.DEBUG)
-        return false
-    end
-end
-
 -- Improving decompression function to handle uncompressed files:
 local function decompress_and_read(filepath)
     local command
@@ -110,7 +87,7 @@ local function decompress_and_read(filepath)
 
     local pipe, err = io.popen(command, 'r')
     if not pipe then
-        logger.log_to_file("Failed to open pipe for: " .. filepath, logger.LogLevel.ERROR)
+        logger.log_to_file("Failed to open pipe for: " .. filepath .. " with error: " .. err, logger.LogLevel.ERROR)
         return nil
     end
     local output = pipe:read("*all")
@@ -152,7 +129,7 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
 
     local db = sqlite3.open(config.config.database_path)
     if not db then
-        logger.log_to_file("Failed to open database at " .. config.config.database_path, logger.LogLevel.ERROR)
+        logger.log_to_file("Failed to open database at " .. config.config.database_path .. " with error: " .. db:errmsg(), logger.LogLevel.ERROR)
         return
     end
 
@@ -164,7 +141,7 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]])
     if not stmt then
-        logger.log_to_file("Failed to prepare SQL statement for: " .. filepath, logger.LogLevel.ERROR)
+        logger.log_to_file("Failed to prepare SQL statement for: " .. filepath .. " with error: " .. db:errmsg(), logger.LogLevel.ERROR)
         db:close()
         return
     end
@@ -178,7 +155,7 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
     )
     local result = stmt:step()
     if result ~= sqlite3.DONE then
-        logger.log_to_file("Failed to insert data into database for: " .. filepath, logger.LogLevel.ERROR)
+        logger.log_to_file("Failed to insert data into database for: " .. filepath .. " with error: " .. stmt:errmsg(), logger.LogLevel.ERROR)
     end
     stmt:finalize()
     db:close()
