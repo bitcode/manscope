@@ -20,18 +20,18 @@ local function ensure_directory_exists(file_path)
 end
 
 local function initialize_database()
-    if not config.database_path then
+    if not config.config.database_path then
         logger.log_to_file("Database path is not set", logger.LogLevel.ERROR)
         error("Database path is not set")
         return
     end
-    logger.log_to_file("Attempting to open database at " .. config.database_path, logger.LogLevel.DEBUG)
-    local db_path = vim.fn.expand(config.database_path)  -- Expand to resolve paths like ~/
+    logger.log_to_file("Attempting to open database at " .. config.config.database_path, logger.LogLevel.DEBUG)
+    local db_path = vim.fn.expand(config.config.database_path)  -- Expand to resolve paths like ~/
     ensure_directory_exists(db_path)
     local db = sqlite3.open(db_path)
     if db == nil then
-        logger.log_to_file("Failed to open database at " .. config.database_path, logger.LogLevel.ERROR)
-        error("Failed to open database at " .. config.database_path)
+        logger.log_to_file("Failed to open database at " .. config.config.database_path, logger.LogLevel.ERROR)
+        error("Failed to open database at " .. config.config.database_path)
     else
         logger.log_to_file("Database opened successfully", logger.LogLevel.INFO)
     end
@@ -73,7 +73,7 @@ local function initialize_database()
     ]]
 
     db:close()
-    logger.log_to_file("Database initialized and tables created successfully at " .. config.database_path, logger.LogLevel.INFO)
+    logger.log_to_file("Database initialized and tables created successfully at " .. config.config.database_path, logger.LogLevel.INFO)
     parse_man_pages.start_parsing()
 end
 
