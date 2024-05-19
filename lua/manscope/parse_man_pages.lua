@@ -149,13 +149,26 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
         return
     end
 
-    local checksum = calculate_checksum(parsed_data.content)
+    -- Ensure all fields are non-nil
+    local title = parsed_data.title or ""
+    local section = parsed_data.section or ""
+    local description = parsed_data.synopsis or ""
+    local content = parsed_data.content or ""
+    local version = parsed_data.version or ""
+    local author = parsed_data.author or ""
+    local format = parsed_data.format or ""
+    local language = parsed_data.language or ""
+    local environment = parsed_data.environment or ""
+
     stmt:bind_values(
-        parsed_data.title, parsed_data.section, parsed_data.synopsis or "", -- Mapping synopsis to description
-        parsed_data.content, parsed_data.version or "", parsed_data.author or "", parsed_data.format or "",
-        parsed_data.language or "", filepath, parsed_data.environment or ""
+        title, section, description,
+        content, version, author, format,
+        language, filepath, environment
     )
-    logger.log_to_file("Executing SQL: REPLACE INTO man_pages VALUES(" .. table.concat({parsed_data.title, parsed_data.section, parsed_data.synopsis or "", parsed_data.content, parsed_data.version or "", parsed_data.author or "", parsed_data.format or "", parsed_data.language or "", filepath, parsed_data.environment or ""}, ", ") .. ")", logger.LogLevel.DEBUG)
+    
+    local values = {title, section, description, content, version, author, format, language, filepath, environment}
+    logger.log_to_file("Executing SQL: REPLACE INTO man_pages VALUES(" .. table.concat(values, ", ") .. ")", logger.LogLevel.DEBUG)
+    
     local result = stmt:step()
     if result ~= sqlite3.DONE then
         logger.log_to_file("Failed to insert data into database for: " .. filepath .. " with error: " .. (stmt and stmt:errmsg() or "unknown error"), logger.LogLevel.ERROR)
