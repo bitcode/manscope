@@ -1,7 +1,7 @@
 local sqlite3 = require('lsqlite3')
 local config = require('manscope.config')
 local logger = require('manscope.log_module')
-local parse_man_pages = require('manscope.parse_man_pages')
+local parse_man_pages = require('manscope.parse_man_pages') -- Make sure this path is correct
 local lfs = require('lfs')
 
 -- Function to ensure the directory for the database file exists
@@ -74,7 +74,7 @@ local function initialize_database()
 
     db:close()
     logger.log_to_file("Database initialized and tables created successfully at " .. config.config.database_path, logger.LogLevel.INFO)
-    parse_man_pages.start_parsing()
+    parse_man_pages.start_parsing() -- Ensure this function exists and is callable
 end
 
 local M = {}

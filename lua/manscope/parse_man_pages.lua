@@ -217,7 +217,7 @@ local function process_directory(path)
 end
 
 -- Main processing function
-local function main()
+local function start_parsing()
     logger.log_to_file("Starting directory processing", logger.LogLevel.INFO)
     local man_directories = get_man_directories()
     for _, path in ipairs(man_directories) do
@@ -230,4 +230,6 @@ local function main()
     end
 end
 
-main()
+return {
+    start_parsing = start_parsing
+}
