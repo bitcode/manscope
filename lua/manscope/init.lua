@@ -1,7 +1,7 @@
 local sqlite3 = require('lsqlite3')
 local config = require('manscope.config')
-local logger = require('manscope.log_module')  -- Require the logging module
-local parse_man_pages = require('manscope.parse_man_pages')  -- Make sure this module exposes the right functions
+local logger = require('manscope.log_module')
+local parse_man_pages = require('manscope.parse_man_pages')
 local lfs = require('lfs')
 
 -- Function to ensure the directory for the database file exists
@@ -19,27 +19,19 @@ local function ensure_directory_exists(file_path)
     return true
 end
 
--- Function to initialize the database and create tables if they don't exist
 local function initialize_database()
-    logger.log_to_file("Starting database initialization", logger.LogLevel.DEBUG)
-    if not config.config.database_path or config.config.database_path == "" then
-        logger.log_to_file("Database path is not set or is empty", logger.LogLevel.ERROR)
-        error("Database path is not set or is empty")
+    if not config.database_path then
+        logger.log_to_file("Database path is not set", logger.LogLevel.ERROR)
+        error("Database path is not set")
         return
     end
-
-    local db_path = vim.fn.expand(config.config.database_path)
-    logger.log_to_file("Expanded database path: " .. db_path, logger.LogLevel.DEBUG)
-    if not ensure_directory_exists(db_path) then
-        error("Failed to ensure database directory exists")
-        return
-    end
-
-    logger.log_to_file("Attempting to open database at " .. db_path, logger.LogLevel.DEBUG)
+    logger.log_to_file("Attempting to open database at " .. config.database_path, logger.LogLevel.DEBUG)
+    local db_path = vim.fn.expand(config.database_path)  -- Expand to resolve paths like ~/
+    ensure_directory_exists(db_path)
     local db = sqlite3.open(db_path)
     if db == nil then
-        logger.log_to_file("Failed to open database at " .. db_path, logger.LogLevel.ERROR)
-        error("Failed to open database at " .. db_path)
+        logger.log_to_file("Failed to open database at " .. config.database_path, logger.LogLevel.ERROR)
+        error("Failed to open database at " .. config.database_path)
     else
         logger.log_to_file("Database opened successfully", logger.LogLevel.INFO)
     end
@@ -47,8 +39,8 @@ local function initialize_database()
     local sql_statements = [[
         CREATE VIRTUAL TABLE IF NOT EXISTS man_pages USING fts5(
             title, section, description UNINDEXED, content,
-            version UNINDEXED, author UNINDEXED, format TEXT,
-            language TEXT DEFAULT 'en', file_path TEXT, environment TEXT
+            version UNINDEXED, author UNINDEXED, format,
+            language, file_path, environment
         );
         CREATE TABLE IF NOT EXISTS command_options (
             man_page_id INTEGER, option TEXT, description TEXT,
@@ -81,7 +73,7 @@ local function initialize_database()
     ]]
 
     db:close()
-    logger.log_to_file("Database initialized and tables created successfully at " .. db_path, logger.LogLevel.INFO)
+    logger.log_to_file("Database initialized and tables created successfully at " .. config.database_path, logger.LogLevel.INFO)
     parse_man_pages.start_parsing()
 end
 
