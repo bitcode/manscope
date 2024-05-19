@@ -72,9 +72,23 @@ local function calculate_checksum(input)
     return checksum
 end
 
--- Check if the file is likely a man page
-local function is_man_page(file)
-    return file:match("man[1-9]$") or file:match("man[1-9][^/]*$")
+-- Check if the file is a valid man page
+local function is_valid_man_page(file)
+    local command = "man --whatis " .. vim.fn.shellescape(file)
+    local output = vim.fn.system(command)
+
+    if vim.v.shell_error ~= 0 then
+        logger.log_to_file("Failed to identify man page: " .. file .. " - Error: " .. vim.v.shell_error, logger.LogLevel.DEBUG)
+        return false
+    end
+
+    if output and output:match("^%S+ %(%d%)") then
+        logger.log_to_file("Confirmed man page: " .. file, logger.LogLevel.DEBUG)
+        return true
+    else
+        logger.log_to_file("Not a man page: " .. file, logger.LogLevel.DEBUG)
+        return false
+    end
 end
 
 -- Improving decompression function to handle uncompressed files:
@@ -124,10 +138,20 @@ local function advanced_parse_man_page(content)
     }
 end
 
--- Update database with parsed data
 local function update_database_with_parsed_data(parsed_data, filepath, last_modified)
-    logger.log_to_file("Database path: " .. config.database_path, logger.LogLevel.DEBUG)
-    local db = sqlite3.open(config.database_path)
+    if not config.config.database_path or config.config.database_path == "" then
+        logger.log_to_file("Database path is not set or is empty", logger.LogLevel.ERROR)
+        return
+    end
+
+    logger.log_to_file("Updating database with parsed data for file: " .. filepath, logger.LogLevel.DEBUG)
+
+    local db = sqlite3.open(config.config.database_path)
+    if not db then
+        logger.log_to_file("Failed to open database at " .. config.config.database_path, logger.LogLevel.ERROR)
+        return
+    end
+
     local stmt = db:prepare([[
         REPLACE INTO man_pages (
             title, section, content, synopsis, example, hyperlink,
@@ -137,6 +161,7 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
     ]])
     if not stmt then
         logger.log_to_file("Failed to prepare SQL statement for: " .. filepath, logger.LogLevel.ERROR)
+        db:close()
         return
     end
 
@@ -163,32 +188,26 @@ local function process_file(fullpath, content)
     update_database_with_parsed_data(parsed_data, fullpath, attr.modification)
 end
 
--- Check if the file is likely a man page
-local function is_man_page(file)
-    return file:match("%.[1-9]$") or
-           file:match("%.[1-9]%.gz$") or
-           file:match("%.[1-9]%.bz2$") or
-           file:match("%.[1-9]%.xz$")
-end
-
 -- Process each directory containing man pages
 local function process_directory(path)
     logger.log_to_file("Checking directory: " .. path, logger.LogLevel.DEBUG)
     for file in lfs.dir(path) do
         local fullpath = path .. '/' .. file
         logger.log_to_file("Inspecting file: " .. fullpath, logger.LogLevel.DEBUG)
-        if file ~= "." and file ~= ".." and is_man_page(file) then
+        if file ~= "." and file ~= ".." then
             local attr = lfs.attributes(fullpath)
             if attr and attr.mode == "file" then
-                local content = decompress_and_read(fullpath)
-                if content then
-                    process_file(fullpath, content)
+                if is_valid_man_page(fullpath) then
+                    local content = decompress_and_read(fullpath)
+                    if content then
+                        process_file(fullpath, content)
+                    else
+                        logger.log_to_file("Failed to read or decompress file: " .. fullpath, logger.LogLevel.ERROR)
+                    end
                 else
-                    logger.log_to_file("Failed to read or decompress file: " .. fullpath, logger.LogLevel.ERROR)
+                    logger.log_to_file("Skipped non-manpage file: " .. fullpath, logger.LogLevel.DEBUG)
                 end
             end
-        else
-            logger.log_to_file("Skipped non-manpage file: " .. fullpath, logger.LogLevel.DEBUG)
         end
     end
 end
