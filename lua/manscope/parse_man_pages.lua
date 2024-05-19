@@ -91,7 +91,10 @@ local function decompress_and_read(filepath)
         return nil, err
     end
     local output = pipe:read("*all")
-    pipe:close()
+    local close_success = pipe:close()
+    if not close_success then
+        logger.log_to_file("Failed to close pipe for: " .. filepath, logger.LogLevel.ERROR)
+    end
     if output and #output > 0 then
         return output
     else
@@ -129,7 +132,7 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
 
     local db = sqlite3.open(config.config.database_path)
     if not db then
-        logger.log_to_file("Failed to open database at " .. config.config.database_path .. " with error: " .. db:errmsg(), logger.LogLevel.ERROR)
+        logger.log_to_file("Failed to open database at " .. config.config.database_path .. " with error: " .. (db and db:errmsg() or "unknown error"), logger.LogLevel.ERROR)
         return
     end
 
@@ -141,7 +144,7 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]])
     if not stmt then
-        logger.log_to_file("Failed to prepare SQL statement for: " .. filepath .. " with error: " .. db:errmsg(), logger.LogLevel.ERROR)
+        logger.log_to_file("Failed to prepare SQL statement for: " .. filepath .. " with error: " .. (db and db:errmsg() or "unknown error"), logger.LogLevel.ERROR)
         db:close()
         return
     end
@@ -154,7 +157,7 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
     )
     local result = stmt:step()
     if result ~= sqlite3.DONE then
-        logger.log_to_file("Failed to insert data into database for: " .. filepath .. " with error: " .. stmt:errmsg(), logger.LogLevel.ERROR)
+        logger.log_to_file("Failed to insert data into database for: " .. filepath .. " with error: " .. (stmt and stmt:errmsg() or "unknown error"), logger.LogLevel.ERROR)
     end
     stmt:finalize()
     db:close()
