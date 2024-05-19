@@ -201,15 +201,11 @@ local function process_directory(path)
         if file ~= "." and file ~= ".." then
             local attr = lfs.attributes(fullpath)
             if attr and attr.mode == "file" then
-                if is_valid_man_page(fullpath) then
-                    local content = decompress_and_read(fullpath)
-                    if content then
-                        process_file(fullpath, content)
-                    else
-                        logger.log_to_file("Failed to read or decompress file: " .. fullpath, logger.LogLevel.ERROR)
-                    end
+                local content = decompress_and_read(fullpath)
+                if content then
+                    process_file(fullpath, content)
                 else
-                    logger.log_to_file("Skipped non-manpage file: " .. fullpath, logger.LogLevel.DEBUG)
+                    logger.log_to_file("Failed to read or decompress file: " .. fullpath, logger.LogLevel.ERROR)
                 end
             end
         end
