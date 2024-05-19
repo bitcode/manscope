@@ -1,7 +1,7 @@
 local lfs = require('lfs')
 local sqlite3 = require('lsqlite3')
 local config = require('manscope.config')
-local logger = require('manscope.log_module')  -- Include the logging module
+local logger = require('manscope.log_module')
 
 -- Function to check if a directory exists and is accessible
 local function directory_exists(path)
