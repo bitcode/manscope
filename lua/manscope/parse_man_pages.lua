@@ -77,6 +77,10 @@ local function is_valid_man_page(file)
     local command = "man --whatis " .. vim.fn.shellescape(file)
     local output = vim.fn.system(command)
 
+    logger.log_to_file("Running command: " .. command, logger.LogLevel.DEBUG)
+    logger.log_to_file("Command output: " .. (output or "nil"), logger.LogLevel.DEBUG)
+    logger.log_to_file("Shell error: " .. vim.v.shell_error, logger.LogLevel.DEBUG)
+
     if vim.v.shell_error ~= 0 then
         logger.log_to_file("Failed to identify man page: " .. file .. " - Error: " .. vim.v.shell_error, logger.LogLevel.DEBUG)
         return false
