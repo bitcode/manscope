@@ -21,14 +21,15 @@ end
 
 -- Function to initialize the database and create tables if they don't exist
 local function initialize_database()
-    local db_path = vim.fn.expand(config.config.database_path or "")
-
-    if db_path == "" then
-        logger.log_to_file("Database path is not set", logger.LogLevel.ERROR)
-        error("Database path is not set")
+    logger.log_to_file("Starting database initialization", logger.LogLevel.DEBUG)
+    if not config.config.database_path or config.config.database_path == "" then
+        logger.log_to_file("Database path is not set or is empty", logger.LogLevel.ERROR)
+        error("Database path is not set or is empty")
         return
     end
 
+    local db_path = vim.fn.expand(config.config.database_path)
+    logger.log_to_file("Expanded database path: " .. db_path, logger.LogLevel.DEBUG)
     if not ensure_directory_exists(db_path) then
         error("Failed to ensure database directory exists")
         return
@@ -92,7 +93,6 @@ M.setup = function(opts)
 
     -- Ensure the database path is expanded and set correctly
     config.config.database_path = vim.fn.expand(config.config.database_path or "")
-
     logger.log_to_file("Configuration loaded: Database path set to " .. tostring(config.config.database_path), logger.LogLevel.DEBUG)
 
     -- Initialize the database only after configuration has been updated
