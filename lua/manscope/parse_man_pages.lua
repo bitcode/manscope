@@ -88,7 +88,7 @@ local function decompress_and_read(filepath)
     local pipe, err = io.popen(command, 'r')
     if not pipe then
         logger.log_to_file("Failed to open pipe for: " .. filepath .. " with error: " .. err, logger.LogLevel.ERROR)
-        return nil
+        return nil, err
     end
     local output = pipe:read("*all")
     pipe:close()
@@ -135,10 +135,10 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
 
     local stmt = db:prepare([[
         REPLACE INTO man_pages (
-            title, section, content, synopsis, example, hyperlink,
-            file_path, last_modified, original_name, compressed_name, content_checksum
+            title, section, description, content, version, author, format,
+            language, file_path, environment
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]])
     if not stmt then
         logger.log_to_file("Failed to prepare SQL statement for: " .. filepath .. " with error: " .. db:errmsg(), logger.LogLevel.ERROR)
@@ -148,10 +148,9 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
 
     local checksum = calculate_checksum(parsed_data.content)
     stmt:bind_values(
-        parsed_data.title, parsed_data.section, parsed_data.content,
-        parsed_data.synopsis, parsed_data.example, parsed_data.hyperlink,
-        filepath, last_modified, parsed_data.original_name, parsed_data.compressed_name,
-        checksum
+        parsed_data.title, parsed_data.section, parsed_data.synopsis or "", -- Mapping synopsis to description
+        parsed_data.content, parsed_data.version or "", parsed_data.author or "", parsed_data.format or "",
+        parsed_data.language or "", filepath, parsed_data.environment or ""
     )
     local result = stmt:step()
     if result ~= sqlite3.DONE then
@@ -169,6 +168,29 @@ local function process_file(fullpath, content)
     update_database_with_parsed_data(parsed_data, fullpath, attr.modification)
 end
 
+-- Check if the file is a valid man page
+local function is_valid_man_page(file)
+    local command = "man --whatis " .. vim.fn.shellescape(file)
+    local output = vim.fn.system(command)
+
+    logger.log_to_file("Running command: " .. command, logger.LogLevel.DEBUG)
+    logger.log_to_file("Command output: " .. (output or "nil"), logger.LogLevel.DEBUG)
+    logger.log_to_file("Shell error: " .. vim.v.shell_error, logger.LogLevel.DEBUG)
+
+    if vim.v.shell_error ~= 0 then
+        logger.log_to_file("Failed to identify man page: " .. file .. " - Error: " .. vim.v.shell_error, logger.LogLevel.DEBUG)
+        return false
+    end
+
+    if output and output:match("^%S+ %(%d%)") then
+        logger.log_to_file("Confirmed man page: " .. file, logger.LogLevel.DEBUG)
+        return true
+    else
+        logger.log_to_file("Not a man page: " .. file, logger.LogLevel.DEBUG)
+        return false
+    end
+end
+
 -- Process each directory containing man pages
 local function process_directory(path)
     logger.log_to_file("Checking directory: " .. path, logger.LogLevel.DEBUG)
@@ -178,11 +200,15 @@ local function process_directory(path)
         if file ~= "." and file ~= ".." then
             local attr = lfs.attributes(fullpath)
             if attr and attr.mode == "file" then
-                local content = decompress_and_read(fullpath)
-                if content then
-                    process_file(fullpath, content)
+                if is_valid_man_page(fullpath) then
+                    local content, err = decompress_and_read(fullpath)
+                    if content then
+                        process_file(fullpath, content)
+                    else
+                        logger.log_to_file("Failed to read or decompress file: " .. fullpath .. (err and (" with error: " .. err) or ""), logger.LogLevel.ERROR)
+                    end
                 else
-                    logger.log_to_file("Failed to read or decompress file: " .. fullpath, logger.LogLevel.ERROR)
+                    logger.log_to_file("Skipped non-manpage file: " .. fullpath, logger.LogLevel.DEBUG)
                 end
             end
         end
