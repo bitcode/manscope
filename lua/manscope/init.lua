@@ -1,8 +1,9 @@
 local sqlite3 = require('lsqlite3')
 local config = require('manscope.config')
 local logger = require('manscope.log_module')
-local parse_man_pages = require('manscope.parse_man_pages') -- Make sure this path is correct
+local parse_man_pages = require('manscope.parse_man_pages')
 local lfs = require('lfs')
+local db_util = require('manscope.db_util')
 
 -- Function to ensure the directory for the database file exists
 local function ensure_directory_exists(file_path)
@@ -26,8 +27,14 @@ local function initialize_database()
         return
     end
     logger.log_to_file("Attempting to open database at " .. config.config.database_path, logger.LogLevel.DEBUG)
-    local db_path = vim.fn.expand(config.config.database_path)  -- Expand to resolve paths like ~/
+    local db_path = vim.fn.expand(config.config.database_path)
     ensure_directory_exists(db_path)
+
+    if db_util.is_database_initialized() then
+        logger.log_to_file("Database already initialized. Skipping initialization.", logger.LogLevel.INFO)
+        return
+    end
+
     local db = sqlite3.open(db_path)
     if db == nil then
         logger.log_to_file("Failed to open database at " .. config.config.database_path, logger.LogLevel.ERROR)
@@ -74,7 +81,7 @@ local function initialize_database()
 
     db:close()
     logger.log_to_file("Database initialized and tables created successfully at " .. config.config.database_path, logger.LogLevel.INFO)
-    parse_man_pages.start_parsing() -- Ensure this function exists and is callable
+    parse_man_pages.start_parsing()
 end
 
 local M = {}
