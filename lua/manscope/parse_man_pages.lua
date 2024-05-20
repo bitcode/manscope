@@ -3,7 +3,6 @@ local sqlite3 = require('lsqlite3')
 local config = require('manscope.config')
 local logger = require('manscope.log_module')
 
--- Function to check if a directory exists and is accessible
 local function directory_exists(path)
     local ok, err, code = os.rename(path, path)
     if not ok then
@@ -15,7 +14,6 @@ local function directory_exists(path)
     return ok, err
 end
 
--- Function to get directories from MANPATH environment variable
 local function get_man_directories_from_env()
     local manpath = os.getenv("MANPATH")
     logger.log_to_file("MANPATH: " .. (manpath or "not set"), logger.LogLevel.DEBUG)
@@ -30,7 +28,6 @@ local function get_man_directories_from_env()
     end
 end
 
--- Function to read directories from /etc/manpath.config
 local function get_man_directories_from_config()
     local paths = {}
     local file = io.open("/etc/manpath.config", "r")
@@ -53,7 +50,6 @@ local function get_man_directories_from_config()
     return paths
 end
 
--- Consolidate all directories to be processed
 local function get_man_directories()
     local paths = get_man_directories_from_env()
     for _, path in ipairs(get_man_directories_from_config()) do
@@ -63,7 +59,6 @@ local function get_man_directories()
     return paths
 end
 
--- Calculate checksum of file content
 local function calculate_checksum(input)
     local checksum = 0
     for i = 1, #input do
@@ -72,7 +67,6 @@ local function calculate_checksum(input)
     return checksum
 end
 
--- Improving decompression function to handle uncompressed files:
 local function decompress_and_read(filepath)
     local command
     if filepath:match("%.gz$") then
@@ -103,7 +97,6 @@ local function decompress_and_read(filepath)
     end
 end
 
--- Parse man page content
 local function advanced_parse_man_page(content)
     local cleaned_content = content:gsub("%.[A-Z]+", ""):gsub("\\f[IRB]", "")
     local title = content:match(".TH%s+\"([^\"]+)\"")
@@ -149,7 +142,6 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
         return
     end
 
-    -- Ensure all fields are non-nil
     local title = parsed_data.title or ""
     local section = parsed_data.section or ""
     local description = parsed_data.synopsis or ""
@@ -179,7 +171,6 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
     db:close()
 end
 
--- Process each man page file
 local function process_file(fullpath, content)
     local attr = lfs.attributes(fullpath)
     local parsed_data = advanced_parse_man_page(content)
@@ -187,7 +178,6 @@ local function process_file(fullpath, content)
     update_database_with_parsed_data(parsed_data, fullpath, attr.modification)
 end
 
--- Check if the file is a valid man page
 local function is_valid_man_page(file)
     local command = "man --path " .. vim.fn.shellescape(file)
     local output = vim.fn.system(command)
@@ -203,7 +193,6 @@ local function is_valid_man_page(file)
     return true
 end
 
--- Recursively process directories to find man page files
 local function process_directory(path)
     for file in lfs.dir(path) do
         if file ~= "." and file ~= ".." then
@@ -227,11 +216,12 @@ local function process_directory(path)
     end
 end
 
--- Main processing function
-local function start_parsing()
-    logger.log_to_file("Starting directory processing", logger.LogLevel.INFO)
+local uv = vim.loop
+
+local function async_start_parsing()
     local man_directories = get_man_directories()
-    for _, path in ipairs(man_directories) do
+    
+    local function process_path(path)
         if directory_exists(path) then
             logger.log_to_file("Processing directory: " .. path, logger.LogLevel.DEBUG)
             process_directory(path)
@@ -239,8 +229,12 @@ local function start_parsing()
             logger.log_to_file("Directory does not exist or cannot be accessed: " .. path, logger.LogLevel.WARNING)
         end
     end
+
+    for _, path in ipairs(man_directories) do
+        uv.new_thread(process_path, path)
+    end
 end
 
 return {
-    start_parsing = start_parsing
+    start_parsing = async_start_parsing
 }
