@@ -5,6 +5,8 @@ local parse_man_pages = require('manscope.parse_man_pages')
 local lfs = require('lfs')
 local db_util = require('manscope.db_util')
 
+local M = {}
+
 local function ensure_directory_exists(file_path)
     local dir_path = vim.fn.fnamemodify(file_path, ":h")
     if not lfs.attributes(dir_path) then
@@ -90,7 +92,7 @@ local function async_initialize_database(callback)
 
         db:close()
         logger.log_to_file("Database initialized and tables created successfully at " .. config.config.database_path, logger.LogLevel.INFO)
-        
+
         -- Continue with parsing
         parse_man_pages.start_parsing()
         if callback then callback() end
