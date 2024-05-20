@@ -40,7 +40,7 @@ return {
         cmd = 'Telescope manscope',
         config = function()
             require('manscope').setup({
-                --database_path = '/path/to/your/database/manscope.db',
+                database_path = '~/.local/share/nvim/lazy/manscope/lua/manscope/manscope.db',
                 language = 'en',  -- Language setting for the man pages
                 search_sensitivity = 'medium',  -- Adjust how sensitive the search is to variations
             })
@@ -70,8 +70,8 @@ After installation, use the following command to search man pages:
 
 ## Logging
 
-The location of the log file is in `$HOME/.cache/nvim`
+The location of the log file is in `$HOME/.cache/nvim/manscope.log`
 
 ## SQLite database location
 
-The location of the database file is in `stdpath('data')` usually `$HOME/.local/share/nvim/`
+The location of the database file is in `~/.local/share/nvim/lazy/manscope/lua/manscope/manscope.db`
