@@ -4,7 +4,14 @@ local logger = require('manscope.log_module')
 
 local M = {}
 
+local initialization_in_progress = false
+
 function M.is_database_initialized()
+    if initialization_in_progress then
+        logger.log_to_file("Database initialization is in progress.", logger.LogLevel.INFO)
+        return false
+    end
+
     local db_path = vim.fn.expand(config.config.database_path)
     local db = sqlite3.open(db_path)
     if not db then
@@ -21,6 +28,10 @@ function M.is_database_initialized()
     end
     db:close()
     return result
+end
+
+function M.set_initialization_in_progress(state)
+    initialization_in_progress = state
 end
 
 return M

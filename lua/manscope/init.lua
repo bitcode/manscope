@@ -33,17 +33,14 @@ local function async_initialize_database(callback)
     local db_path = vim.fn.expand(config.config.database_path)
     ensure_directory_exists(db_path)
 
-    if db_util.is_database_initialized() then
-        logger.log_to_file("Database already initialized. Skipping initialization.", logger.LogLevel.INFO)
-        if callback then callback() end
-        return
-    end
+    db_util.set_initialization_in_progress(true)
 
     -- Run database initialization in a separate coroutine
     coroutine.wrap(function()
         local db = sqlite3.open(db_path)
         if db == nil then
             logger.log_to_file("Failed to open database at " .. config.config.database_path, logger.LogLevel.ERROR)
+            db_util.set_initialization_in_progress(false)
             error("Failed to open database at " .. config.config.database_path)
         else
             logger.log_to_file("Database opened successfully", logger.LogLevel.INFO)
@@ -78,6 +75,7 @@ local function async_initialize_database(callback)
         if db:exec(sql_statements) ~= sqlite3.OK then
             logger.log_to_file("Failed to create tables: " .. db:errmsg(), logger.LogLevel.ERROR)
             db:close()  -- Ensure the database is closed on failure
+            db_util.set_initialization_in_progress(false)
             error("Failed to create tables: " .. db:errmsg())
         end
 
@@ -87,6 +85,7 @@ local function async_initialize_database(callback)
         ]] ~= sqlite3.OK then
             logger.log_to_file("Failed to insert initial data: " .. db:errmsg(), logger.LogLevel.ERROR)
             db:close()  -- Ensure the database is closed on failure
+            db_util.set_initialization_in_progress(false)
             error("Failed to insert initial data: " .. db:errmsg())
         end
 
@@ -95,6 +94,7 @@ local function async_initialize_database(callback)
 
         -- Continue with parsing
         parse_man_pages.start_parsing()
+        db_util.set_initialization_in_progress(false)
         if callback then callback() end
     end)()
 end
