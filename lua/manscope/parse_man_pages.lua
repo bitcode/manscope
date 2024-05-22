@@ -157,10 +157,10 @@ local function update_database_with_parsed_data(parsed_data, filepath, last_modi
         content, version, author, format,
         language, filepath, environment
     )
-    
+
     local values = {title, section, description, content, version, author, format, language, filepath, environment}
     logger.log_to_file("Executing SQL: REPLACE INTO man_pages VALUES(" .. table.concat(values, ", ") .. ")", logger.LogLevel.DEBUG)
-    
+
     local result = stmt:step()
     if result ~= sqlite3.DONE then
         logger.log_to_file("Failed to insert data into database for: " .. filepath .. " with error: " .. (stmt and stmt:errmsg() or "unknown error"), logger.LogLevel.ERROR)
