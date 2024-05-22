@@ -32,3 +32,5 @@ function M.log_to_file(msg, level)
         vim.notify("Failed to close log file: " .. close_err, vim.log.levels.ERROR)
     end
 end
+
+return M

@@ -5,9 +5,9 @@ local lfs = require('lfs')
 local db_util = require('manscope.db_util')
 
 -- Ensure logger is correctly required
-local success, logger = pcall(require, 'manscope.log_module')
-if not success then
-    error("Failed to load log_module: " .. logger)
+local logger = require('manscope.log_module')
+if type(logger) ~= "table" then
+    error("Failed to load log_module: logger is not a table")
 end
 
 local M = {}
