@@ -1,9 +1,14 @@
 local sqlite3 = require('lsqlite3')
 local config = require('manscope.config')
-local logger = require('manscope.log_module')
 local parse_man_pages = require('manscope.parse_man_pages')
 local lfs = require('lfs')
 local db_util = require('manscope.db_util')
+
+-- Ensure logger is correctly required
+local success, logger = pcall(require, 'manscope.log_module')
+if not success then
+    error("Failed to load log_module: " .. logger)
+end
 
 local M = {}
 
