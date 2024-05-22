@@ -18,12 +18,17 @@ function M.log_to_file(msg, level)
 
     local file, err = io.open(log_file_path, 'a')
     if not file then
-        print("Failed to open log file: " .. err)
+        vim.notify("Failed to open log file: " .. err, vim.log.levels.ERROR)
         return
     end
 
-    file:write(final_message)
-    file:close()
-end
+    local success, write_err = pcall(file.write, file, final_message)
+    if not success then
+        vim.notify("Failed to write to log file: " .. write_err, vim.log.levels.ERROR)
+    end
 
-return M
+    local close_success, close_err = pcall(file.close, file)
+    if not close_success then
+        vim.notify("Failed to close log file: " .. close_err, vim.log.levels.ERROR)
+    end
+end

@@ -220,7 +220,7 @@ local uv = vim.loop
 
 local function async_start_parsing()
     local man_directories = get_man_directories()
-    
+
     local function process_path(path)
         if directory_exists(path) then
             logger.log_to_file("Processing directory: " .. path, logger.LogLevel.DEBUG)

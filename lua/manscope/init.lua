@@ -13,6 +13,7 @@ local function ensure_directory_exists(file_path)
         local result, err = lfs.mkdir(dir_path)
         if not result then
             logger.log_to_file("Failed to create directory " .. dir_path .. ": " .. err, logger.LogLevel.ERROR)
+            vim.notify("Failed to create directory " .. dir_path .. ": " .. err, vim.log.levels.ERROR)
             return false
         else
             logger.log_to_file("Created directory: " .. dir_path, logger.LogLevel.INFO)
@@ -20,8 +21,6 @@ local function ensure_directory_exists(file_path)
     end
     return true
 end
-
-local uv = vim.loop
 
 local function async_initialize_database(callback)
     if not config.config.database_path then
@@ -31,7 +30,10 @@ local function async_initialize_database(callback)
     end
     logger.log_to_file("Attempting to open database at " .. config.config.database_path, logger.LogLevel.DEBUG)
     local db_path = vim.fn.expand(config.config.database_path)
-    ensure_directory_exists(db_path)
+    if not ensure_directory_exists(db_path) then
+        vim.notify("Directory creation failed for " .. db_path, vim.log.levels.ERROR)
+        return
+    end
 
     db_util.set_initialization_in_progress(true)
 
