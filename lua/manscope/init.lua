@@ -3,9 +3,8 @@ local config = require('manscope.config')
 local parse_man_pages = require('manscope.parse_man_pages')
 local lfs = require('lfs')
 local db_util = require('manscope.db_util')
-
--- Ensure logger is correctly required
 local logger = require('manscope.log_module')
+
 if type(logger) ~= "table" then
     error("Failed to load log_module: logger is not a table")
 end
@@ -13,6 +12,7 @@ end
 local M = {}
 
 local function ensure_directory_exists(file_path)
+    logger.log_to_file("Ensuring directory exists for path: " .. file_path, logger.LogLevel.DEBUG)
     local dir_path = vim.fn.fnamemodify(file_path, ":h")
     if not lfs.attributes(dir_path) then
         local result, err = lfs.mkdir(dir_path)
@@ -28,6 +28,7 @@ local function ensure_directory_exists(file_path)
 end
 
 local function async_initialize_database(callback)
+    logger.log_to_file("Initializing database", logger.LogLevel.DEBUG)
     if not config.config.database_path then
         logger.log_to_file("Database path is not set", logger.LogLevel.ERROR)
         error("Database path is not set")
@@ -107,6 +108,7 @@ local function async_initialize_database(callback)
 end
 
 M.setup = function(opts)
+    logger.log_to_file("Setting up Manscope with options", logger.LogLevel.DEBUG)
     -- Extend the default configuration with user-provided options
     config.config = vim.tbl_deep_extend("force", config.config, opts or {})
 
