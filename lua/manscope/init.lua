@@ -45,6 +45,7 @@ local function async_initialize_database(callback)
 
     -- Run database initialization in a separate coroutine
     coroutine.wrap(function()
+        logger.log_to_file("Started coroutine for database initialization", logger.LogLevel.DEBUG)
         local db = sqlite3.open(db_path)
         if db == nil then
             logger.log_to_file("Failed to open database at " .. config.config.database_path, logger.LogLevel.ERROR)

@@ -7,6 +7,7 @@ local M = {}
 local initialization_in_progress = false
 
 function M.is_database_initialized()
+    logger.log_to_file("Checking if database is initialized", logger.LogLevel.DEBUG)
     if initialization_in_progress then
         logger.log_to_file("Database initialization is in progress.", logger.LogLevel.INFO)
         return false
@@ -27,11 +28,13 @@ function M.is_database_initialized()
         end
     end
     db:close()
+    logger.log_to_file("Database initialized: " .. tostring(result), logger.LogLevel.DEBUG)
     return result
 end
 
 function M.set_initialization_in_progress(state)
     initialization_in_progress = state
+    logger.log_to_file("Set initialization_in_progress to " .. tostring(state), logger.LogLevel.DEBUG)
 end
 
 return M

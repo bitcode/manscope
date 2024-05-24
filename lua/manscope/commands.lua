@@ -1,9 +1,9 @@
--- File: ./lua/manscope/commands.lua
 local logger = require('manscope.log_module')
 local parse_man_pages = require('manscope.parse_man_pages')
 local db_util = require('manscope.db_util')
 
 local function cycle_man_pages()
+    logger.log_to_file("Entered cycle_man_pages function", logger.LogLevel.DEBUG)
     if not db_util.is_database_initialized() then
         vim.notify("Database is not initialized. Run the setup first.", vim.log.levels.ERROR)
         logger.log_to_file("CycleManPages: Database is not initialized.", logger.LogLevel.ERROR)
