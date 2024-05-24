@@ -5,14 +5,46 @@ local logger = require('manscope.log_module')
 local uv = vim.loop
 
 local function directory_exists(path)
-    local ok, err, code = os.rename(path, path)
-    if not ok then
+    logger.log_to_file("Checking if directory exists for path: " .. path, logger.LogLevel.DEBUG)
+
+    -- Check if the path exists
+    local attr, err, code = lfs.attributes(path)
+    if not attr then
         if code == 13 then
-            -- Permission denied, but directory exists
-            return true
+            logger.log_to_file("Permission denied for path: " .. path, logger.LogLevel.ERROR)
+            return true  -- Permission denied, but directory exists
+        elseif code == 2 then
+            logger.log_to_file("Path does not exist: " .. path, logger.LogLevel.WARNING)
+            return false  -- Path does not exist
+        else
+            logger.log_to_file("Error checking path: " .. path .. " Error: " .. err, logger.LogLevel.ERROR)
+            return false, err  -- Other error
         end
     end
-    return ok, err
+
+    -- Check if the path is a directory
+    if attr.mode ~= "directory" then
+        logger.log_to_file("Path is not a directory: " .. path, logger.LogLevel.WARNING)
+        return false, "Path is not a directory"
+    end
+
+    -- Check for symbolic links
+    local real_path = lfs.symlinkattributes(path, "target")
+    if real_path then
+        logger.log_to_file("Path is a symbolic link: " .. path .. " -> " .. real_path, logger.LogLevel.DEBUG)
+        attr, err, code = lfs.attributes(real_path)
+        if not attr then
+            logger.log_to_file("Error checking real path of symbolic link: " .. real_path .. " Error: " .. err, logger.LogLevel.ERROR)
+            return false, err
+        end
+        if attr.mode ~= "directory" then
+            logger.log_to_file("Real path of symbolic link is not a directory: " .. real_path, logger.LogLevel.WARNING)
+            return false, "Real path of symbolic link is not a directory"
+        end
+    end
+
+    logger.log_to_file("Directory exists: " .. path, logger.LogLevel.DEBUG)
+    return true
 end
 
 local function get_man_directories_from_env()
