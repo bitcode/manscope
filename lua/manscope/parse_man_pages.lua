@@ -231,7 +231,9 @@ local function async_start_parsing()
     end
 
     for _, path in ipairs(man_directories) do
-        uv.new_thread(process_path, path)
+        uv.new_thread(function()
+            process_path(path)
+        end)()
     end
 end
 
