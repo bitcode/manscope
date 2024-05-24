@@ -57,6 +57,7 @@ local function get_man_directories_from_env()
         end
         return paths
     else
+        logger.log_to_file("MANPATH is empty or not set", logger.LogLevel.DEBUG)
         return {}
     end
 end
