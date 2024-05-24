@@ -2,6 +2,7 @@ local lfs = require('lfs')
 local sqlite3 = require('lsqlite3')
 local config = require('manscope.config')
 local logger = require('manscope.log_module')
+local uv = vim.loop
 
 local function directory_exists(path)
     local ok, err, code = os.rename(path, path)
@@ -85,9 +86,9 @@ local function decompress_and_read(filepath)
         return nil, err
     end
     local output = pipe:read("*all")
-    local close_success = pipe:close()
-    if not close_success then
-        logger.log_to_file("Failed to close pipe for: " .. filepath, logger.LogLevel.ERROR)
+    local success, close_err = pipe:close()
+    if not success then
+        logger.log_to_file("Failed to close pipe for: " .. filepath .. " with error: " .. close_err, logger.LogLevel.ERROR)
     end
     if output and #output > 0 then
         return output
@@ -216,24 +217,20 @@ local function process_directory(path)
     end
 end
 
-local uv = vim.loop
+local function process_path(path)
+    if directory_exists(path) then
+        logger.log_to_file("Processing directory: " .. path, logger.LogLevel.DEBUG)
+        process_directory(path)
+    else
+        logger.log_to_file("Directory does not exist or cannot be accessed: " .. path, logger.LogLevel.WARNING)
+    end
+end
 
 local function async_start_parsing()
     local man_directories = get_man_directories()
 
-    local function process_path(path)
-        if directory_exists(path) then
-            logger.log_to_file("Processing directory: " .. path, logger.LogLevel.DEBUG)
-            process_directory(path)
-        else
-            logger.log_to_file("Directory does not exist or cannot be accessed: " .. path, logger.LogLevel.WARNING)
-        end
-    end
-
     for _, path in ipairs(man_directories) do
-        uv.new_thread(function()
-            process_path(path)
-        end)()
+        uv.new_thread(process_path, path)
     end
 end
 
